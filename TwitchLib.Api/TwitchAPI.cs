@@ -13,7 +13,6 @@ namespace TwitchLib.Api
         private readonly ILogger<TwitchAPI> _logger;
         public IApiSettings Settings { get; }
         public Auth.Auth Auth { get; }
-        public V5.V5 V5 { get; }
         public Helix.Helix Helix { get; }
         public ThirdParty.ThirdParty ThirdParty { get; }
         public Undocumented Undocumented { get; }
@@ -34,7 +33,6 @@ namespace TwitchLib.Api
 
             Auth = new Auth.Auth(Settings, rateLimiter, http);
             Helix = new Helix.Helix(loggerFactory, rateLimiter, Settings, http);
-            V5 = new V5.V5(loggerFactory, rateLimiter, Settings, http);
             ThirdParty = new ThirdParty.ThirdParty(Settings, rateLimiter, http);
             Undocumented = new Undocumented(Settings, rateLimiter, http);
 
@@ -46,27 +44,21 @@ namespace TwitchLib.Api
             switch (e.PropertyName)
             {
                 case nameof(IApiSettings.AccessToken):
-                    V5.Settings.AccessToken = Settings.AccessToken;
                     Helix.Settings.AccessToken = Settings.AccessToken;
                     break;
                 case nameof(IApiSettings.Secret):
-                    V5.Settings.Secret = Settings.Secret;
                     Helix.Settings.Secret = Settings.Secret;
                     break;
                 case nameof(IApiSettings.ClientId):
-                    V5.Settings.ClientId = Settings.ClientId;
                     Helix.Settings.ClientId = Settings.ClientId;
                     break;
                 case nameof(IApiSettings.SkipDynamicScopeValidation):
-                    V5.Settings.SkipDynamicScopeValidation = Settings.SkipDynamicScopeValidation;
                     Helix.Settings.SkipDynamicScopeValidation = Settings.SkipDynamicScopeValidation;
                     break;
                 case nameof(IApiSettings.SkipAutoServerTokenGeneration):
-                    V5.Settings.SkipAutoServerTokenGeneration = Settings.SkipAutoServerTokenGeneration;
                     Helix.Settings.SkipAutoServerTokenGeneration = Settings.SkipAutoServerTokenGeneration;
                     break;
                 case nameof(IApiSettings.Scopes):
-                    V5.Settings.Scopes = Settings.Scopes;
                     Helix.Settings.Scopes = Settings.Scopes;
                     break;
             }
