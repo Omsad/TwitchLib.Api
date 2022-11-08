@@ -21,5 +21,15 @@ namespace TwitchLib.Api.Helix.Models.Predictions
         public string WinningOutcomeId { get; protected set; }
         [JsonProperty(PropertyName = "outcomes")]
         public Outcome[] Outcomes { get; protected set; }
+        [JsonProperty(PropertyName = "prediction_window")]
+        public int PredictionWindow { get; protected set; }
+        [JsonProperty(PropertyName = "status")]
+        public string Status { get; protected set; }
+        [JsonProperty(PropertyName = "created_at")]
+        public DateTime CreatedAt { get; protected set; }
+        [JsonProperty(PropertyName = "ended_at")]
+        public DateTime? EndedAt { get; protected set; }
+        [JsonProperty(PropertyName = "locked_at")]
+        public DateTime? LockedAt { get; protected set; }
     }
 }
