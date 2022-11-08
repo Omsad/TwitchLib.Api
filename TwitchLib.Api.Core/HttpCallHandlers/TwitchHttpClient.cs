@@ -16,6 +16,7 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
     {
         private readonly ILogger<TwitchHttpClient> _logger;
         private readonly HttpClient _http;
+        private readonly Action<HttpRequestMessage> _argumentRequest = DefaultArgumentRequest;
 
         /// <summary>
         /// Creates an Instance of the TwitchHttpClient Class.
@@ -26,6 +27,19 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
             _logger = logger;
             _http = new HttpClient(new TwitchHttpClientHandler(_logger));
         }
+
+        /// <summary>
+        /// Creates an Instance of the TwitchHttpClient Class.
+        /// </summary>
+        /// <param name="httpClient">The HTTP client.</param>
+        /// <param name="argumentRequest">Callback to argument any request made.</param>
+        public TwitchHttpClient(HttpClient httpClient, Action<HttpRequestMessage> argumentRequest)
+        {
+            _http = httpClient;
+            _argumentRequest = argumentRequest ?? DefaultArgumentRequest;
+        }
+
+        private static void DefaultArgumentRequest(HttpRequestMessage request) { }
 
 
         public void PutBytes(string url, byte[] payload)
@@ -44,8 +58,8 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
                 Method = new HttpMethod(method)
             };
 
-            if (string.IsNullOrEmpty(clientId) && string.IsNullOrEmpty(accessToken))
-                throw new InvalidCredentialException("A Client-Id or OAuth token is required to use the Twitch API. If you previously set them in InitializeAsync, please be sure to await the method.");
+            if (string.IsNullOrEmpty(clientId))// && string.IsNullOrEmpty(accessToken))
+                throw new InvalidCredentialException("A Client-Id is required to use the Twitch API. If you previously set them in InitializeAsync, please be sure to await the method.");
 
             if (!string.IsNullOrEmpty(clientId))
             {
@@ -68,6 +82,7 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
             if (payload != null)
                 request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
+            _argumentRequest(request);
 
             var response = _http.SendAsync(request).GetAwaiter().GetResult();
             if (response.IsSuccessStatusCode)
