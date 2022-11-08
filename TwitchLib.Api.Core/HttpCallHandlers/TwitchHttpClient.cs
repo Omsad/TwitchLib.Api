@@ -1,10 +1,12 @@
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using TwitchLib.Api.Core.Common;
 using TwitchLib.Api.Core.Enums;
 using TwitchLib.Api.Core.Exceptions;
 using TwitchLib.Api.Core.Interfaces;
@@ -12,6 +14,9 @@ using TwitchLib.Api.Core.Internal;
 
 namespace TwitchLib.Api.Core.HttpCallHandlers
 {
+    /// <summary>
+    /// Main HttpClient used to call the Twitch API
+    /// </summary>
     public class TwitchHttpClient : IHttpCallHandler
     {
         private readonly ILogger<TwitchHttpClient> _logger;
@@ -41,16 +46,33 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
 
         private static void DefaultArgumentRequest(HttpRequestMessage request) { }
 
-
-        public void PutBytes(string url, byte[] payload)
+        /// <summary>
+        /// PUT Request with a byte array body
+        /// </summary>
+        /// <param name="url">URL to direct the PUT request at</param>
+        /// <param name="payload">Payload to send with the request</param>
+        /// <returns>Task for the request</returns>
+        public async Task PutBytesAsync(string url, byte[] payload)
         {
-            var response = _http.PutAsync(new Uri(url), new ByteArrayContent(payload)).GetAwaiter().GetResult();
+            var response = await _http.PutAsync(new Uri(url), new ByteArrayContent(payload)).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
                 HandleWebException(response);
         }
 
-        public KeyValuePair<int, string> GeneralRequest(string url, string method, string payload = null, ApiVersion api = ApiVersion.V5, string clientId = null, string accessToken = null)
+        /// <summary>
+        /// Used to make API calls to the Twitch API varying by Method, URL and payload
+        /// </summary>
+        /// <param name="url">URL to call</param>
+        /// <param name="method">HTTP Method to use for the API call</param>
+        /// <param name="payload">Payload to send with the API call</param>
+        /// <param name="api">Which API version is called</param>
+        /// <param name="clientId">Twitch ClientId</param>
+        /// <param name="accessToken">Twitch AccessToken linked to the ClientId</param>
+        /// <returns>KeyValuePair with the key being the returned StatusCode and the Value being the ResponseBody as string</returns>
+        /// <exception cref="InvalidCredentialException"></exception>
+        public async Task<KeyValuePair<int, string>> GeneralRequestAsync(string url, string method,
+            string payload = null, ApiVersion api = ApiVersion.Helix, string clientId = null, string accessToken = null)
         {
             var request = new HttpRequestMessage
             {
@@ -58,36 +80,32 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
                 Method = new HttpMethod(method)
             };
 
-            if (string.IsNullOrEmpty(clientId))// && string.IsNullOrEmpty(accessToken))
-                throw new InvalidCredentialException("A Client-Id is required to use the Twitch API. If you previously set them in InitializeAsync, please be sure to await the method.");
-
-            if (!string.IsNullOrEmpty(clientId))
+            if (api == ApiVersion.Helix)
             {
+                if (string.IsNullOrWhiteSpace(clientId))// || string.IsNullOrWhiteSpace(accessToken))
+                    throw new InvalidCredentialException("A Client-Id is required to use the Twitch API.");
+
                 request.Headers.Add("Client-ID", clientId);
             }
 
             var authPrefix = "OAuth";
-            if (api == ApiVersion.Helix)
+            if (api == ApiVersion.Helix || api == ApiVersion.Auth)
             {
                 request.Headers.Add(HttpRequestHeader.Accept.ToString(), "application/json");
                 authPrefix = "Bearer";
             }
-            else if (api != ApiVersion.Void)
-            {
-                request.Headers.Add(HttpRequestHeader.Accept.ToString(), $"application/vnd.twitchtv.v{(int)api}+json");
-            }
-            if (!string.IsNullOrEmpty(accessToken))
-                request.Headers.Add(HttpRequestHeader.Authorization.ToString(), $"{authPrefix} {Common.Helpers.FormatOAuth(accessToken)}");
+
+            if (!string.IsNullOrWhiteSpace(accessToken))
+                request.Headers.Add(HttpRequestHeader.Authorization.ToString(), $"{authPrefix} {Helpers.FormatOAuth(accessToken)}");
 
             if (payload != null)
                 request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
             _argumentRequest(request);
-
-            var response = _http.SendAsync(request).GetAwaiter().GetResult();
+            var response = await _http.SendAsync(request).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
-                var respStr =  response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                var respStr = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 return new KeyValuePair<int, string>((int)response.StatusCode, respStr);
             }
 
@@ -95,7 +113,7 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
             return new KeyValuePair<int, string>(0, null);
         }
 
-        public int RequestReturnResponseCode(string url, string method, List<KeyValuePair<string, string>> getParams = null)
+        public async Task<int> RequestReturnResponseCodeAsync(string url, string method, List<KeyValuePair<string, string>> getParams = null)
         {
             if (getParams != null)
             {
@@ -113,7 +131,7 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
                 RequestUri = new Uri(url),
                 Method = new HttpMethod(method)
             };
-            var response = _http.SendAsync(request).GetAwaiter().GetResult();
+            var response = await _http.SendAsync(request).ConfigureAwait(false);
             return (int)response.StatusCode;
         }
 
@@ -127,12 +145,9 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
                     var authenticateHeader = errorResp.Headers.WwwAuthenticate;
                     if (authenticateHeader == null || authenticateHeader.Count <= 0)
                         throw new BadScopeException("Your request was blocked due to bad credentials (Do you have the right scope for your access token?).");
-                    else
-                        throw new TokenExpiredException("Your request was blocked due to an expired Token. Please refresh your token and update your API instance settings.");
+                    throw new TokenExpiredException("Your request was blocked due to an expired Token. Please refresh your token and update your API instance settings.");
                 case HttpStatusCode.NotFound:
                     throw new BadResourceException("The resource you tried to access was not valid.");
-                case (HttpStatusCode)422:
-                    throw new NotPartneredException("The resource you requested is only available to channels that have been partnered by Twitch.");
                 case (HttpStatusCode)429:
                     errorResp.Headers.TryGetValues("Ratelimit-Reset", out var resetTime);
                     throw new TooManyRequestsException("You have reached your rate limit. Too many requests were made", resetTime.FirstOrDefault());

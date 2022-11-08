@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using TwitchLib.Api.Helix.Models.Users;
 using TwitchLib.Api.Helix.Models.Users.GetUserFollows;
 using TwitchLib.Api.Interfaces;
 using TwitchLib.Api.Services.Core.FollowerService;
@@ -13,6 +12,7 @@ namespace TwitchLib.Api.Services
     public class FollowerService : ApiService
     {
         private readonly Dictionary<string, DateTime> _lastFollowerDates = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        private readonly bool _invokeEventsOnStartup;
 
         private CoreMonitor _monitor;
         private IdBasedMonitor _idBasedMonitor;
@@ -38,7 +38,7 @@ namespace TwitchLib.Api.Services
         /// Event which is called when new followers are detected.
         /// </summary>
         public event EventHandler<OnNewFollowersDetectedArgs> OnNewFollowersDetected;
-        
+
         /// <summary>
         /// FollowerService constructor.
         /// </summary>
@@ -50,7 +50,8 @@ namespace TwitchLib.Api.Services
         /// <param name="checkIntervalInSeconds">How often new followers should be queried.</param>
         /// <param name="queryCountPerRequest">The amount of followers to query per request.</param>
         /// <param name="cacheSize">The maximum amount of followers to cache per channel.</param>
-        public FollowerService(ITwitchAPI api, int checkIntervalInSeconds = 60, int queryCountPerRequest = 100, int cacheSize = 1000) : 
+        /// <param name="invokeEventsOnStartup">Whether to invoke the update events on startup or not.</param>
+        public FollowerService(ITwitchAPI api, int checkIntervalInSeconds = 60, int queryCountPerRequest = 100, int cacheSize = 1000, bool invokeEventsOnStartup = false) : 
             base(api, checkIntervalInSeconds)
         {
             if (queryCountPerRequest < 1 || queryCountPerRequest > 100)
@@ -61,6 +62,7 @@ namespace TwitchLib.Api.Services
 
             QueryCountPerRequest = queryCountPerRequest;
             CacheSize = cacheSize;
+            _invokeEventsOnStartup = invokeEventsOnStartup;
         }
 
         /// <summary>
@@ -126,6 +128,9 @@ namespace TwitchLib.Api.Services
                     newFollowers = latestFollowers;
                     KnownFollowers[channel] = latestFollowers.Take(CacheSize).ToList();
                     _lastFollowerDates[channel] = latestFollowers.Last().FollowedAt;
+
+                    if (!_invokeEventsOnStartup)
+                        return;
                 }
                 else
                 {

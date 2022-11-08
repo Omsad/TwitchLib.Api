@@ -10,17 +10,19 @@ jobs:
    runs-on: ubuntu-latest
 
    steps:
-   - uses: actions/checkout@v2
+   - uses: actions/checkout@v3
+   - uses: benjlevesque/short-sha@v2.1
+     id: short-sha
    - name: Setup .NET
-     uses: actions/setup-dotnet@v1
+     uses: actions/setup-dotnet@v2
      with:
-       dotnet-version: 5.0.x
+       dotnet-version: 6.0.x
    - name: Restore dependencies
      run: dotnet restore
    - name: Build TwitchLib.Api
      run: dotnet build -c Release --no-restore
    - name: Pack TwitchLib.Api
-     run: dotnet pack TwitchLib.Api.sln -v normal -c Release -o nugets --no-build --version-suffix "preview-${{ github.sha }}"
+     run: dotnet pack TwitchLib.Api.sln -v normal -c Release -o nugets --no-build --version-suffix "preview-${{ steps.short-sha.outputs.sha }}"
    - name: Push to Nuget
      run: dotnet nuget push "./nugets/*.nupkg" -k ${{ secrets.API_NUGET_TOKEN }} -s https://api.nuget.org/v3/index.json
    - name: Send Discord Notification

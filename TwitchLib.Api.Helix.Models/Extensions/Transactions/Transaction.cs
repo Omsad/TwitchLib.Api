@@ -1,7 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System;
+using Newtonsoft.Json;
 
 namespace TwitchLib.Api.Helix.Models.Extensions.Transactions
 {
@@ -19,6 +17,8 @@ namespace TwitchLib.Api.Helix.Models.Extensions.Transactions
         public string BroadcasterName { get; protected set; }
         [JsonProperty(PropertyName = "user_id")]
         public string UserId { get; protected set; }
+        [JsonProperty(PropertyName = "user_login")]
+        public string UserLogin { get; protected set; }
         [JsonProperty(PropertyName = "user_name")]
         public string UserName { get; protected set; }
         [JsonProperty(PropertyName = "product_type")]

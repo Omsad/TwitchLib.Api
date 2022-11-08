@@ -12,8 +12,12 @@ namespace TwitchLib.Api.Helix.Models.Clips.GetClips
         public string EmbedUrl { get; protected set; }
         [JsonProperty(PropertyName = "broadcaster_id")]
         public string BroadcasterId { get; protected set; }
+        [JsonProperty(PropertyName = "broadcaster_name")]
+        public string BroadcasterName { get; protected set; }
         [JsonProperty(PropertyName = "creator_id")]
         public string CreatorId { get; protected set; }
+        [JsonProperty(PropertyName = "creator_name")]
+        public string CreatorName { get; protected set; }
         [JsonProperty(PropertyName = "video_id")]
         public string VideoId { get; protected set; }
         [JsonProperty(PropertyName = "game_id")]
@@ -30,5 +34,7 @@ namespace TwitchLib.Api.Helix.Models.Clips.GetClips
         public string ThumbnailUrl { get; protected set; }
         [JsonProperty(PropertyName = "duration")]
         public float Duration { get; protected set; }
+        [JsonProperty(PropertyName = "vod_offset")]
+        public int VodOffset { get; protected set; }
     }
 }

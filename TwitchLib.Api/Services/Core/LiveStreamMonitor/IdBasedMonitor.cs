@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using TwitchLib.Api.Helix.Models.Streams;
 using TwitchLib.Api.Helix.Models.Streams.GetStreams;
 using TwitchLib.Api.Interfaces;
 
@@ -11,14 +10,14 @@ namespace TwitchLib.Api.Services.Core.LiveStreamMonitor
     {
         public IdBasedMonitor(ITwitchAPI api) : base(api) { }
 
-        public override Task<Func<Stream, bool>> CompareStream(string channel)
+        public override Task<Func<Stream, bool>> CompareStream(string channel, string accessToken = null)
         {
             return Task.FromResult(new Func<Stream, bool>(stream => stream.UserId == channel));
         }
 
-        public override Task<GetStreamsResponse> GetStreamsAsync(List<string> channels)
+        public override Task<GetStreamsResponse> GetStreamsAsync(List<string> channels, string accessToken = null)
         {
-            return _api.Helix.Streams.GetStreamsAsync(first: channels.Count, userIds: channels);
+            return _api.Helix.Streams.GetStreamsAsync(first: channels.Count, userIds: channels, accessToken: accessToken);
         }
     }
 }
