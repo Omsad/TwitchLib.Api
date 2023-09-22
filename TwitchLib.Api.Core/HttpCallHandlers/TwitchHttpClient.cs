@@ -182,7 +182,7 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
                     break;
              
                 default:
-                    exception = new HttpRequestException("Something went wrong during the request! Please try again later", errorResp);
+                    exception = new HttpResponseException("Something went wrong during the request! Please try again later", errorResp);
                     break;
             }
 
