@@ -21,6 +21,7 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
     {
         private readonly ILogger<TwitchHttpClient> _logger;
         private readonly HttpClient _http;
+        private readonly Action<HttpRequestMessage> _argumentRequest = DefaultArgumentRequest;
 
         /// <summary>
         /// Creates an Instance of the TwitchHttpClient Class.
@@ -31,6 +32,19 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
             _logger = logger;
             _http = new HttpClient(new TwitchHttpClientHandler(_logger));
         }
+
+        /// <summary>
+        /// Creates an Instance of the TwitchHttpClient Class.
+        /// </summary>
+        /// <param name="httpClient">The HTTP client.</param>
+        /// <param name="argumentRequest">Callback to argument any request made.</param>
+        public TwitchHttpClient(HttpClient httpClient, Action<HttpRequestMessage> argumentRequest)
+        {
+            _http = httpClient;
+            _argumentRequest = argumentRequest ?? DefaultArgumentRequest;
+        }
+
+        private static void DefaultArgumentRequest(HttpRequestMessage request) { }
 
         /// <summary>
         /// PUT Request with a byte array body
@@ -68,8 +82,8 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
 
             if (api == ApiVersion.Helix)
             {
-                if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(accessToken))
-                    throw new InvalidCredentialException("A Client-Id and OAuth token is required to use the Twitch API.");
+                if (string.IsNullOrWhiteSpace(clientId))// || string.IsNullOrWhiteSpace(accessToken))
+                    throw new InvalidCredentialException("A Client-Id is required to use the Twitch API.");
 
                 request.Headers.Add("Client-ID", clientId);
             }
@@ -87,6 +101,7 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
             if (payload != null)
                 request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
+            _argumentRequest(request);
             var response = await _http.SendAsync(request).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
@@ -122,32 +137,58 @@ namespace TwitchLib.Api.Core.HttpCallHandlers
 
         private void HandleWebException(HttpResponseMessage errorResp)
         {
+            Exception exception;
             switch (errorResp.StatusCode)
             {
                 case HttpStatusCode.BadRequest:
-                    throw new BadRequestException("Your request failed because either: \n 1. Your ClientID was invalid/not set. \n 2. Your refresh token was invalid. \n 3. You requested a username when the server was expecting a user ID.", errorResp);
-                case HttpStatusCode.Unauthorized:
-                    var authenticateHeader = errorResp.Headers.WwwAuthenticate;
-                    if (authenticateHeader == null || authenticateHeader.Count <= 0)
-                        throw new BadScopeException("Your request was blocked due to bad credentials (Do you have the right scope for your access token?).", errorResp);
-                    throw new TokenExpiredException("Your request was blocked due to an expired Token. Please refresh your token and update your API instance settings.", errorResp);
-                case HttpStatusCode.NotFound:
-                    throw new BadResourceException("The resource you tried to access was not valid.", errorResp);
-                case (HttpStatusCode)429:
-                    errorResp.Headers.TryGetValues("Ratelimit-Reset", out var resetTime);
-                    throw new TooManyRequestsException("You have reached your rate limit. Too many requests were made", resetTime.FirstOrDefault(), errorResp);
-                case HttpStatusCode.BadGateway:
-                    throw new BadGatewayException("The API answered with a 502 Bad Gateway. Please retry your request", errorResp);
-                case HttpStatusCode.GatewayTimeout:
-                    throw new GatewayTimeoutException("The API answered with a 504 Gateway Timeout. Please retry your request", errorResp);
-                case HttpStatusCode.InternalServerError:
-                    throw new InternalServerErrorException("The API answered with a 500 Internal Server Error. Please retry your request", errorResp);
-                case HttpStatusCode.Forbidden:
-                    throw new BadTokenException("The token provided in the request did not match the associated user. Make sure the token you're using is from the resource owner (streamer? viewer?)", errorResp);
-                default:
-                    throw new HttpRequestException("Something went wrong during the request! Please try again later");
-            }
-        }
+                    exception = new BadRequestException("Your request failed because either: \n 1. Your ClientID was invalid/not set. \n 2. Your refresh token was invalid. \n 3. You requested a username when the server was expecting a user ID.", errorResp);
+                    break;
 
+                case HttpStatusCode.Unauthorized:
+                    {
+                        var authenticateHeader = errorResp.Headers.WwwAuthenticate;
+                        if (authenticateHeader == null || authenticateHeader.Count <= 0)
+                            exception = new BadScopeException("Your request was blocked due to bad credentials (Do you have the right scope for your access token?).", errorResp);
+                        else
+                            exception = new TokenExpiredException("Your request was blocked due to an expired Token. Please refresh your token and update your API instance settings.", errorResp);
+                    }
+                    break;
+
+                case HttpStatusCode.NotFound:
+                    exception = new BadResourceException("The resource you tried to access was not valid.", errorResp);
+                    break;
+               
+                case (HttpStatusCode)429:
+                    {
+                        errorResp.Headers.TryGetValues("Ratelimit-Reset", out var resetTime);
+                        exception = new TooManyRequestsException("You have reached your rate limit. Too many requests were made", resetTime.FirstOrDefault(), errorResp);
+                    }
+                    break;
+              
+                case HttpStatusCode.BadGateway:
+                    exception = new BadGatewayException("The API answered with a 502 Bad Gateway. Please retry your request", errorResp);
+                    break;
+               
+                case HttpStatusCode.GatewayTimeout:
+                    exception = new GatewayTimeoutException("The API answered with a 504 Gateway Timeout. Please retry your request", errorResp);
+                    break;
+               
+                case HttpStatusCode.InternalServerError:
+                    exception = new InternalServerErrorException("The API answered with a 500 Internal Server Error. Please retry your request", errorResp);
+                    break;
+              
+                case HttpStatusCode.Forbidden:
+                    exception = new BadTokenException("The token provided in the request did not match the associated user. Make sure the token you're using is from the resource owner (streamer? viewer?)", errorResp);
+                    break;
+             
+                default:
+                    exception = new HttpResponseException("Something went wrong during the request! Please try again later", errorResp);
+                    break;
+            }
+
+            exception.Data.Add("StatusCode", errorResp.StatusCode);
+			exception.Data.Add("ReasonPhrase", errorResp.ReasonPhrase);
+            throw exception;
+		}
     }
 }
